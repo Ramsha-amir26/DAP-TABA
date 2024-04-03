@@ -6,9 +6,10 @@
 
 from pymongo import MongoClient
 import pandas as pd
+import certifi
 
 def read_data_from_mongodb(uri, database_name, collection_name):
-    client = MongoClient(uri)
+    client = MongoClient(uri, tlsCAFile=certifi.where())
     db = client[database_name]
     collection = db[collection_name]
 
