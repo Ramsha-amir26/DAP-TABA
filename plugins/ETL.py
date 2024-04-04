@@ -3,8 +3,8 @@ from read_records_mongo import read_data_from_mongodb
 import psycopg2
 import pandas as pd
 import os
-import json
 import numpy as np
+import ast
 
 class Extract(luigi.Task):
 
@@ -18,7 +18,6 @@ class Extract(luigi.Task):
     def run(self):
         data = read_data_from_mongodb(self.mongo_connection_string, self.mongo_db_name, self.collection_name)
         data.to_csv(self.output().path, index=False)
-
 
 
 class Transform(luigi.Task):
@@ -40,29 +39,34 @@ class Transform(luigi.Task):
     def output(self):
         return luigi.LocalTarget("data/transformed_data.csv") 
     
-    def extract_id(self, json_str):
-        # Convert JSON-like string to dictionary
-        try:
-            json_str = str(json_str).replace("'",'"')
-            json_dict = json.loads(json_str)
-        except:
-            print(json_str)
-        return json_dict['ID']
+    # transformation for ev_charging_stations datset
+    def modifyDT3(self, df):
+            df = df.drop(columns=['DataProvider', 'OperatorInfo', 'UsageType', 'SubmissionStatus', 'StatusType', 'PercentageSimilarity',
+                        'GeneralComments', 'DataProvidersReference', 'UserComments', 'ID', 'GeneralComments', 'MediaItems'])
+
+            df['AddressInfo'] = df['AddressInfo'].apply(ast.literal_eval)
+            df2 = pd.DataFrame(df['AddressInfo'].tolist())
+            df2 = df2.fillna("NULL")
+
+            df2 = df2.drop(columns=['ID', 'Country', 'CountryID', 'ContactTelephone1', 'ContactTelephone2', 'ContactEmail', 'AccessComments', 'RelatedURL'])
+            df = df.drop(columns=['AddressInfo'])
+
+            df = pd.concat([df, df2], axis=1)
+            df = df.astype('str')
+
+            return df
 
 
     def run(self):
         # Transforming data for postgres
-        df = pd.read_csv(self.input().path)
+        df = pd.read_csv(self.input().path, low_memory=False, lineterminator='\n')
         df = df.fillna('NULL')
         df = df.replace(np.nan, 'NULL')
 
         if (self.collection_name == 'ev_charging_stations'):
-            df = df.drop(columns=['DataProvider', 'OperatorInfo', 'UsageType', 'SubmissionStatus', 'UUID', 'StatusType'])
-
-            df['ID'] = df['AddressInfo'].apply(self.extract_id)
-            df = df.drop(columns=['AddressInfo'])
-
+            df = self.modifyDT3(df)
         
+        # string manipulation
         df = df.replace('', 'NULL', regex=True)
         df = df.replace("''", '"', regex=True)
         df = df.drop(columns=['_id'])
@@ -98,11 +102,12 @@ class Load(luigi.Task):
             user='sammam', 
             password='mysecretpassword'
         )
+
         cursor = conn.cursor()
 
-        df = pd.read_csv(self.input().path, keep_default_na=False)
+        df = pd.read_csv(self.input().path, keep_default_na=False, low_memory=False, lineterminator='\n')
 
-        columns_init = ','.join([f'"{col}" VARCHAR(10000)' for col in df.columns])
+        columns_init = ','.join([f'"{col}" VARCHAR(5000)' for col in df.columns])
 
         q = f"CREATE TABLE IF NOT EXISTS {self.collection_name} ({columns_init})"
         cursor.execute(q)
@@ -112,12 +117,8 @@ class Load(luigi.Task):
 
             values = tuple(row.values)
             placeholders = ', '.join(['%s'] * len(values))
-            try:
-                sql_query = f"INSERT INTO {self.collection_name} VALUES ({placeholders})"
-                cursor.execute(sql_query, values)
-            except:
-                print(values)
-                print('\n')
+            sql_query = f"INSERT INTO {self.collection_name} VALUES ({placeholders})"
+            cursor.execute(sql_query, values)
             conn.commit()
 
         cursor.close()
