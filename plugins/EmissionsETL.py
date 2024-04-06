@@ -3,8 +3,6 @@ from read_records_mongo import read_data_from_mongodb
 import psycopg2
 import pandas as pd
 import os
-import numpy as np
-import ast
 
 class Extract(luigi.Task):
 
@@ -39,41 +37,45 @@ class Transform(luigi.Task):
     def output(self):
         return luigi.LocalTarget("data/transformed_data.csv") 
     
-    # transformation for ev_charging_stations datset
-    def modifyDT3(self, df):
-            df = df.drop(columns=['DataProvider', 'OperatorInfo', 'UsageType', 'SubmissionStatus', 'StatusType', 'PercentageSimilarity',
-                        'GeneralComments', 'DataProvidersReference', 'UserComments', 'ID', 'GeneralComments', 'MediaItems'])
+    def split_values(self, x):
+        split_values = x.split('/')
+        if len(split_values) == 1:
+            return pd.Series([split_values[0], '0'])
+        else:
+            return pd.Series(split_values)
 
-            df['AddressInfo'] = df['AddressInfo'].apply(ast.literal_eval)
-            df2 = pd.DataFrame(df['AddressInfo'].tolist())
-            df2 = df2.fillna("NULL")
+    def transformToInteger(self, df):
+        try:
+            df[['City MPG', 'City MPG Alternate']] = df['City MPG'].apply(self.split_values)
+            df[['Hwy MPG', 'Hwy MPG Alternate']]= df['Hwy MPG'].apply(self.split_values)
+            df[['Cmb MPG', 'Cmb MPG Alternate']]= df['Cmb MPG'].apply(self.split_values)
+            df[['Comb CO2', 'Comb CO2 Alternate']] = df['Comb CO2'].apply(self.split_values)
 
-            df2 = df2.drop(columns=['ID', 'Country', 'CountryID', 'ContactTelephone1', 'ContactTelephone2', 'ContactEmail', 'AccessComments', 'RelatedURL'])
-            df = df.drop(columns=['AddressInfo'])
+        except:
+            print(df['City MPG'].str.split('/'))
 
-            df = pd.concat([df, df2], axis=1)
-            df = df.astype('str')
-
-            return df
+        return df
 
 
     def run(self):
         # Transforming data for postgres
         df = pd.read_csv(self.input().path, low_memory=False, lineterminator='\n')
+
+        # drop rows containing null values
         df = df.dropna()
-        df = df.fillna('NULL')
-        df = df.replace(np.nan, 'NULL')
 
-        if (self.collection_name == 'ev_charging_stations'):
-            df = self.modifyDT3(df)
+        ## Format columns to take integer value
+        df = self.transformToInteger(df)
 
-        df['City MPG'] = df['City MPG'].str.split('/').str[0]
-        df['Hwy MPG'] = df['Hwy MPG'].str.split('/').str[0]
-        df['Cmb MPG'] = df['Cmb MPG'].str.split('/').str[0]
-        df['Comb CO2'] = df['Comb CO2'].str.split('/').str[0]
+        # Define the desired order of columns
+        desired_order = ['_id', 'Underhood ID', 'Stnd','Model', 'Displ', 'Cyl', 'Trans', 'Drive', 'Fuel', 'Veh Class', 'Air Pollution Score',
+                         'City MPG', 'City MPG Alternate', 'Hwy MPG', 'Hwy MPG Alternate', 'Cmb MPG', 'Cmb MPG Alternate',
+                         'Greenhouse Gas Score', 'SmartWay', 'Comb CO2', 'Comb CO2 Alternate', 'Stnd Description', 'Cert Region']
+
+        # Rearrange columns
+        df = df[desired_order]
         
         # string manipulation
-        df = df.replace('', 'NULL', regex=True)
         df = df.replace("''", '"', regex=True)
         df = df.drop(columns=['_id'])
 
@@ -89,6 +91,8 @@ class Load(luigi.Task):
     mongo_db_name = luigi.Parameter()
     postgres_db_name = luigi.Parameter()
     collection_name = luigi.Parameter()
+    postgres_db_username = luigi.Parameter()
+    postgres_db_password = luigi.Parameter()
 
     def requires(self):
         return Transform(
@@ -102,24 +106,20 @@ class Load(luigi.Task):
 
     def run(self):
         conn = psycopg2.connect(
-            host=self.postgres_host,
-            port=self.postgres_port,
-            dbname=self.postgres_db_name,
-            user='sammam', 
-            password='mysecretpassword'
+            host = self.postgres_host,
+            port = self.postgres_port,
+            dbname = self.postgres_db_name,
+            user = self.postgres_db_username, 
+            password = self.postgres_db_password
         )
 
-        cursor = conn.cursor()
-
+        cursor = conn.cursor() 
         df = pd.read_csv(self.input().path, keep_default_na=False, low_memory=False, lineterminator='\n')
 
-
         for index, row in df.iterrows():
-
             row = dict(row)
             emission_values = (row['Stnd'], row['Cert Region'], row['Stnd Description'])
-            detail_values = (row['Underhood ID'], row['Stnd'], row['Model'], row['Displ'], row['Cyl'], row['Trans'], row['Drive'], row['Fuel'], row['Veh Class'], row['Air Pollution Score'], 
-                row['City MPG'], row['Hwy MPG'], row['Cmb MPG'], row['Greenhouse Gas Score'], row['SmartWay'], row['Comb CO2'])
+            detail_values  = tuple(list(row.values())[0: 20])
 
             placeholders = ', '.join(['%s'] * len(emission_values))
             sql_query = f"INSERT INTO emission_standard VALUES ({placeholders}) ON CONFLICT (stnd) DO NOTHING"
@@ -131,11 +131,10 @@ class Load(luigi.Task):
             cursor.execute(sql_query, detail_values)
             conn.commit()
 
-
         cursor.close()
         conn.close()
 
-        ## remove temperory files
+        # remove temperory files
         if os.path.exists(self.input().path):
             os.remove(self.input().path)
         
