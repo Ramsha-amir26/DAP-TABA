@@ -60,11 +60,17 @@ class Transform(luigi.Task):
     def run(self):
         # Transforming data for postgres
         df = pd.read_csv(self.input().path, low_memory=False, lineterminator='\n')
+        df = df.dropna()
         df = df.fillna('NULL')
         df = df.replace(np.nan, 'NULL')
 
         if (self.collection_name == 'ev_charging_stations'):
             df = self.modifyDT3(df)
+
+        df['City MPG'] = df['City MPG'].str.split('/').str[0]
+        df['Hwy MPG'] = df['Hwy MPG'].str.split('/').str[0]
+        df['Cmb MPG'] = df['Cmb MPG'].str.split('/').str[0]
+        df['Comb CO2'] = df['Comb CO2'].str.split('/').str[0]
         
         # string manipulation
         df = df.replace('', 'NULL', regex=True)
@@ -107,19 +113,24 @@ class Load(luigi.Task):
 
         df = pd.read_csv(self.input().path, keep_default_na=False, low_memory=False, lineterminator='\n')
 
-        columns_init = ','.join([f'"{col}" VARCHAR(5000)' for col in df.columns])
-
-        q = f"CREATE TABLE IF NOT EXISTS {self.collection_name} ({columns_init})"
-        cursor.execute(q)
-        conn.commit()
 
         for index, row in df.iterrows():
 
-            values = tuple(row.values)
-            placeholders = ', '.join(['%s'] * len(values))
-            sql_query = f"INSERT INTO {self.collection_name} VALUES ({placeholders})"
-            cursor.execute(sql_query, values)
+            row = dict(row)
+            emission_values = (row['Stnd'], row['Cert Region'], row['Stnd Description'])
+            detail_values = (row['Underhood ID'], row['Stnd'], row['Model'], row['Displ'], row['Cyl'], row['Trans'], row['Drive'], row['Fuel'], row['Veh Class'], row['Air Pollution Score'], 
+                row['City MPG'], row['Hwy MPG'], row['Cmb MPG'], row['Greenhouse Gas Score'], row['SmartWay'], row['Comb CO2'])
+
+            placeholders = ', '.join(['%s'] * len(emission_values))
+            sql_query = f"INSERT INTO emission_standard VALUES ({placeholders}) ON CONFLICT (stnd) DO NOTHING"
+            cursor.execute(sql_query, emission_values)
             conn.commit()
+        
+            placeholders = ', '.join(['%s'] * len(detail_values))
+            sql_query = f"INSERT INTO car_details VALUES ({placeholders}) ON CONFLICT (underhood_id, stnd) DO NOTHING"
+            cursor.execute(sql_query, detail_values)
+            conn.commit()
+
 
         cursor.close()
         conn.close()
