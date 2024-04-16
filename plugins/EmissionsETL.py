@@ -50,9 +50,23 @@ class Transform(luigi.Task):
             df[['Hwy MPG', 'Hwy MPG Alternate']]= df['Hwy MPG'].apply(self.split_values)
             df[['Cmb MPG', 'Cmb MPG Alternate']]= df['Cmb MPG'].apply(self.split_values)
             df[['Comb CO2', 'Comb CO2 Alternate']] = df['Comb CO2'].apply(self.split_values)
-
         except:
             print(df['City MPG'].str.split('/'))
+
+        return df
+    
+    def remove_outliers(self, df):
+        cols = ['disp', 'cyl', 'greenhouse_gas_score']
+
+        for col in cols:
+            quartiles = df[col].quantile([0.20, 0.80])
+            q1 = quartiles.loc[0.20]
+            q3 = quartiles.loc[0.80]
+
+            low_bound = q1 - 1.5 * (q3 - q1)
+            upp_bound = q3 + 1.5 * (q3 - q1)
+
+            df = df[(df[col] >= low_bound) & (df[col] <= upp_bound)]
 
         return df
 
@@ -66,6 +80,9 @@ class Transform(luigi.Task):
 
         ## Format columns to take integer value
         df = self.transformToInteger(df)
+        
+        ## remove outliers
+        df = self.remove_outliers(df)
 
         # Define the desired order of columns
         desired_order = ['_id', 'Underhood ID', 'Stnd','Model', 'Displ', 'Cyl', 'Trans', 'Drive', 'Fuel', 'Veh Class', 'Air Pollution Score',
