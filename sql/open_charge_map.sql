@@ -57,7 +57,6 @@ CREATE TABLE AddressInfo (
     AddressID INT DEFAULT NEXTVAL('address_info_seq') PRIMARY KEY,
     Title VARCHAR(255),
     AddressLine1 VARCHAR(255),
-    AddressLine2 VARCHAR(255),
     Town VARCHAR(255),
     StateOrProvince VARCHAR(255),
     Postcode VARCHAR(255),
@@ -65,27 +64,32 @@ CREATE TABLE AddressInfo (
     Latitude DECIMAL(18, 15),
     Longitude DECIMAL(18, 15),
     ContactTelephone1 VARCHAR(20),
-    ContactTelephone2 VARCHAR(20),
-    ContactEmail VARCHAR(255),
-    AccessComments TEXT,
-    RelatedURL VARCHAR(255),
-    Distance DECIMAL(10, 2),
-    DistanceUnit INT,
     FOREIGN KEY (CountryID) REFERENCES Country(CountryID)
 );
 
 CREATE SEQUENCE connection_seq START 1;
 
+CREATE TABLE ConnectionType (
+    ConnectionTypeID INT DEFAULT NEXTVAL('country_seq') PRIMARY KEY,
+    FormalName VARCHAR(255),
+    IsDiscontinued BOOLEAN,
+    IsObsolete BOOLEAN,
+    Title VARCHAR(255)
+)
+
+CREATE SEQUENCE connection_type_seq START 1;
+
 CREATE TABLE Connection (
-    ConnectionID INT DEFAULT NEXTVAL('connection_seq') PRIMARY KEY,
+    ConnectionID INT DEFAULT NEXTVAL('connection_type_seq') PRIMARY KEY,
     StatusTypeID INT,
     LevelID INT,
     CurrentTypeID INT,
+    ConnectionTypeID INT,
     Quantity INT,
     PowerKW INT,
-    Comments VARCHAR(255),
     FOREIGN KEY (StatusTypeID) REFERENCES StatusType(StatusTypeID),
     FOREIGN KEY (LevelID) REFERENCES Level(LevelID),
+    FOREIGN KEY (ConnectionTypeID) REFERENCES ConnectionType(ConnectionTypeID),
     FOREIGN KEY (CurrentTypeID) REFERENCES CurrentType(CurrentTypeID)
 );
 
@@ -98,8 +102,8 @@ CREATE TABLE OpenChargeMap (
     ConnectionID INT,
     UsageTypeID INT,
     IsRecentlyVerified BOOLEAN,
-    DateLastVerified TIMESTAMP,
-    DateCreated TIMESTAMP,
+    DateLastVerified DATE,
+    DateCreated DATE,
     SubmissionStatusTypeID INT,
     FOREIGN KEY (UsageTypeID) REFERENCES UsageType(UsageTypeID),
     FOREIGN KEY (SubmissionStatusTypeID) REFERENCES SubmissionStatus(SubmissionStatusTypeID),
@@ -121,4 +125,10 @@ ADD CONSTRAINT unique_level_title UNIQUE (Title);
 
 ALTER TABLE StatusType
 ADD CONSTRAINT unique_status_type_title UNIQUE (Title);
+
+ALTER TABLE ConnectionType
+ADD CONSTRAINT unique_connection_title UNIQUE (Title);
+
+ALTER TABLE UsageType
+ADD CONSTRAINT unique_usage_type_title UNIQUE (Title);
 
