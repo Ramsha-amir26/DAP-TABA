@@ -56,7 +56,7 @@ class Transform(luigi.Task):
         return df
     
     def remove_outliers(self, df):
-        cols = ['disp', 'cyl', 'greenhouse_gas_score']
+        cols = ['Displ', 'Cyl', 'Greenhouse Gas Score']
 
         for col in cols:
             quartiles = df[col].quantile([0.20, 0.80])
@@ -82,7 +82,7 @@ class Transform(luigi.Task):
         df = self.transformToInteger(df)
         
         ## remove outliers
-        df = self.remove_outliers(df)
+        # df = self.remove_outliers(df)
 
         # Define the desired order of columns
         desired_order = ['_id', 'Underhood ID', 'Stnd','Model', 'Displ', 'Cyl', 'Trans', 'Drive', 'Fuel', 'Veh Class', 'Air Pollution Score',
