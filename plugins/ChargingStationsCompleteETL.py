@@ -73,14 +73,24 @@ class TransformData(luigi.Task):
         }
 
     def transform_usage_type(self, entry):
-        usage_type = entry.get('UsageType', {})
-        return {
-            'UsageTypeID': usage_type.get('ID'),
-            'IsPayAtLocation': usage_type.get('IsPayAtLocation'),
-            'IsMembershipRequired': usage_type.get('IsMembershipRequired'),
-            'IsAccessKeyRequired': usage_type.get('IsAccessKeyRequired'),
-            'Title': usage_type.get('Title')
-        }
+        usage_type = entry.get('UsageType')
+        if usage_type:
+            return {
+                'UsageTypeID': usage_type.get('ID'),
+                'IsPayAtLocation': usage_type.get('IsPayAtLocation'),
+                'IsMembershipRequired': usage_type.get('IsMembershipRequired'),
+                'IsAccessKeyRequired': usage_type.get('IsAccessKeyRequired'),
+                'Title': usage_type.get('Title')
+            }
+        else:
+            return {
+                'UsageTypeID': None,
+                'IsPayAtLocation': None,
+                'IsMembershipRequired': None,
+                'IsAccessKeyRequired': None,
+                'Title': None
+            }
+
 
     def transform_address(self, entry):
         address_info = entry.get('AddressInfo', {})
@@ -103,6 +113,32 @@ class TransformData(luigi.Task):
         }
 
     def transform_connection(self, connection):
+        if connection.get('StatusType'):
+            status_type = connection['StatusType']
+            is_operational = status_type.get('IsOperational')
+            is_user_selectable = status_type.get('IsUserSelectable')
+            title = status_type.get('Title')
+        else:
+            is_operational = None
+            is_user_selectable = None
+            title = None
+
+        if connection.get('Level'):
+            comments = connection['Level'].get('Comments')
+            is_fast_charge_capable = connection['Level'].get('IsFastChargeCapable')
+            level_title = connection['Level'].get('Title')
+        else:
+            comments = None
+            is_fast_charge_capable = None
+            level_title = None
+
+        if connection.get('CurrentType'):
+            description = connection['CurrentType'].get('Description')
+            title = connection['CurrentType'].get('Title')
+        else:
+            description = None
+            title = None
+
         transformed_connection = {
             'ConnectionID': connection.get('ID'),
             'ConnectionType': {
@@ -113,25 +149,27 @@ class TransformData(luigi.Task):
                 'Title': connection['ConnectionType'].get('Title')
             },
             'StatusType': {
-                'IsOperational': connection['StatusType'].get('IsOperational'),
-                'IsUserSelectable': connection['StatusType'].get('IsUserSelectable'),
-                'Title': connection['StatusType'].get('Title')
+                'IsOperational': is_operational,
+                'IsUserSelectable': is_user_selectable,
+                'Title': title
             },
             'Level': {
                 'LevelID': connection.get('ID'),
-                'Comments': connection['Level'].get('Comments'),
-                'IsFastChargeCapable': connection['Level'].get('IsFastChargeCapable'),
-                'Title': connection['Level'].get('Title')
+                'Comments': comments,
+                'IsFastChargeCapable': is_fast_charge_capable,
+                'Title': level_title
             },
             'CurrentType': {
                 'CurrentTypeID': connection.get('ID'),
-                'Description': connection['CurrentType'].get('Description'),
-                'Title': connection['CurrentType'].get('Title')
+                'Description': description,
+                'Title': title
             },
             'Quantity': connection.get('Quantity'),
             'PowerKW': connection.get('PowerKW')
         }
         return transformed_connection
+
+
 
     def format_date(self, date_str):
         if date_str is None:
