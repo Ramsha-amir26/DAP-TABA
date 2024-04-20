@@ -141,12 +141,13 @@ class Load(luigi.Task):
             placeholders = ', '.join(['%s'] * len(emission_values))
             sql_query = f"INSERT INTO emission_standard VALUES ({placeholders}) ON CONFLICT (stnd) DO NOTHING"
             cursor.execute(sql_query, emission_values)
-            conn.commit()
         
             placeholders = ', '.join(['%s'] * len(detail_values))
             sql_query = f"INSERT INTO car_details VALUES ({placeholders}) ON CONFLICT (underhood_id, stnd) DO NOTHING"
             cursor.execute(sql_query, detail_values)
-            conn.commit()
+
+            print("index is ", index)
+        conn.commit()
 
         cursor.close()
         conn.close()
