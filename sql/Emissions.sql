@@ -50,6 +50,11 @@ IMPORT FOREIGN SCHEMA public
 FROM SERVER foreign_server
 INTO public;
 
+BEGIN;
+DROP FOREIGN TABLE public.counties, public.electric_vehicles , public.vehicle_primary_uses;
+IMPORT FOREIGN SCHEMA public FROM SERVER foreign_server INTO public;
+COMMIT;
+
 SELECT *
 FROM 
     (SELECT *
@@ -59,6 +64,4 @@ INNER JOIN
     (SELECT *
      FROM electric_vehicles
      INNER JOIN counties ON electric_vehicles.county_id = counties.id) AS population
-ON details.cert_region = population.state;
-
-DROP FOREIGN TABLE public.counties, public.electric_vehicles , public.vehicle_primary_uses;
+ON details.cert_region = population.state
