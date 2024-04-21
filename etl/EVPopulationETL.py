@@ -55,6 +55,7 @@ class TransformData(luigi.Task):
         
         self.remove_duplicate_rows(df)
         self.remove_null_values(df)
+        self.remove_outliers(df)
     
         transformed_data = []
         for index, row in df.iterrows():
@@ -83,12 +84,26 @@ class TransformData(luigi.Task):
             return formatted_date
         except (ValueError, TypeError):
             return None
+
     def remove_duplicate_rows(self, df):
         duplicate_rows = df[df.duplicated()]
         if not duplicate_rows.empty:
             print("Duplicate rows found:")
             print(duplicate_rows)
             df.drop_duplicates(inplace=True)
+
+    def remove_outliers(self, df):
+        cols = ['Total Vehicles', 'Percent Electric Vehicles']
+        for col in cols:
+            quartiles = df[col].quantile([0.20, 0.80])
+            q1 = quartiles.loc[0.20]
+            q3 = quartiles.loc[0.80]
+
+            low_bound = q1 - 1.5 * (q3 - q1)
+            upp_bound = q3 + 1.5 * (q3 - q1)
+
+            df = df[(df[col] >= low_bound) & (df[col] <= upp_bound)]
+        return df
 
     def remove_null_values(self, df):
         df.dropna(subset=["County", "State"], inplace=True)
@@ -171,3 +186,6 @@ class LoadDataIntoPostgreSQL(luigi.Task):
         primary_use_id = cursor.fetchone()
         if primary_use_id is not None:
             return primary_use_id[0]
+
+if __name__ == "__main__":
+    luigi.run(['LoadDataIntoPostgreSQL', '--local-scheduler'])

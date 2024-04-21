@@ -1,5 +1,5 @@
 import luigi
-from read_records_mongo import read_data_from_mongodb
+from plugins.read_records_mongo import read_data_from_mongodb
 import psycopg2
 import pandas as pd
 import os
@@ -162,4 +162,7 @@ class Load(luigi.Task):
 
 
 if __name__ == "__main__":
-    luigi.run()
+    from luigi import build
+    build([Load()], local_scheduler=True)
+
+

@@ -3,7 +3,6 @@ import pymongo
 import psycopg2
 from datetime import datetime
 import json
-import pandas as pd
 
 MONGODB_URI = "mongodb+srv://ramsha0amir:gYk6WWjS0ACv6kFQ@cluster0.a0p69eg.mongodb.net/"
 DATABASE_NAME = "ev_database"
@@ -417,3 +416,6 @@ class LoadDataToPostgres(luigi.Task):
                 (submission_status_data["Title"],)
             )
             return cur.fetchone()[0]
+
+if __name__ == "__main__":
+    luigi.run(['LoadDataToPostgres', '--local-scheduler'])
