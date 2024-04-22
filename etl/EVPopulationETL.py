@@ -17,10 +17,10 @@ DATABASE_NAME = "ev_database"
 COLLECTION_NAME = "ev_population"
 
 # PostgreSQL connection details
-POSTGRES_DB_NAME = "d7o2v0t05ltbk9"
-POSTGRES_USER = "uat366enhv0hv4"
-POSTGRES_PASSWORD = "p25ce6cd8f98ee06dfa822ae01a93833c68649897452d765f20897e60414c63ca"
-POSTGRES_HOST = "c7gljno857ucsl.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com"
+POSTGRES_DB_NAME = "postgres"
+POSTGRES_USER = "postgres"
+POSTGRES_PASSWORD = "javamylife"
+POSTGRES_HOST = "database-3.c5go4e6kame4.us-east-1.rds.amazonaws.com"
 POSTGRES_PORT = 5432
 
 class ExtractDataFromMongoDB(luigi.Task):

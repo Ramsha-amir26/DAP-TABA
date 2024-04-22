@@ -8,10 +8,10 @@ MONGODB_URI = "mongodb+srv://ramsha0amir:gYk6WWjS0ACv6kFQ@cluster0.a0p69eg.mongo
 DATABASE_NAME = "ev_database"
 COLLECTION_NAME = "ev_charging_stations"
 
-POSTGRES_DB_NAME = "d98hjdk7pfqndj"
-POSTGRES_USER = "u81drfdtd54dcp"
-POSTGRES_PASSWORD = "p65a4a6d8d6e8d6b26cd2248db325179a98ed96c458a615ccfc4b4870a7c045a8"
-POSTGRES_HOST = "c9pbiquf6p6pfn.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com"
+POSTGRES_DB_NAME = "postgres"
+POSTGRES_USER = "postgres"
+POSTGRES_PASSWORD = "javamylife"
+POSTGRES_HOST = "database-1.ctqg0gsq67st.eu-north-1.rds.amazonaws.com"
 POSTGRES_PORT = 5432
 
 
