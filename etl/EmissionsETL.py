@@ -3,6 +3,7 @@ from plugins.read_records_mongo import read_data_from_mongodb
 import psycopg2
 import pandas as pd
 import os
+from luigi import build
 
 class Extract(luigi.Task):
 
@@ -10,10 +11,10 @@ class Extract(luigi.Task):
     mongo_db_name = luigi.Parameter()
     collection_name = luigi.Parameter()
 
-    def output(self):
+    def output(self):  ## local file path to store data
         return luigi.LocalTarget("data/mongo_data.csv")
 
-    def run(self):
+    def run(self):   ## read data from mongo sb and store in csv file
         data = read_data_from_mongodb(self.mongo_connection_string, self.mongo_db_name, self.collection_name)
         data.to_csv(self.output().path, index=False)
 
@@ -32,10 +33,10 @@ class Transform(luigi.Task):
         )
     
     def input(self):
-        return luigi.LocalTarget("data/mongo_data.csv")
+        return luigi.LocalTarget("data/mongo_data.csv") ## input local file path
 
     def output(self):
-        return luigi.LocalTarget("data/transformed_data.csv") 
+        return luigi.LocalTarget("data/transformed_data.csv") ## output local file path
     
     def split_values(self, x):
         split_values = x.split('/')
@@ -44,7 +45,7 @@ class Transform(luigi.Task):
         else:
             return pd.Series(split_values)
 
-    def transformToInteger(self, df):
+    def transformToInteger(self, df):  ## manipulate string data for storage as integer
         try:
             df[['City MPG', 'City MPG Alternate']] = df['City MPG'].apply(self.split_values)
             df[['Hwy MPG', 'Hwy MPG Alternate']]= df['Hwy MPG'].apply(self.split_values)
@@ -55,7 +56,7 @@ class Transform(luigi.Task):
 
         return df
     
-    def remove_outliers(self, df):
+    def remove_outliers(self, df):      # remove outliers from dataset
         cols = ['Displ', 'Cyl', 'Greenhouse Gas Score']
 
         for col in cols:
@@ -101,15 +102,15 @@ class Transform(luigi.Task):
 
 
 class Load(luigi.Task):
-
-    mongo_connection_string = luigi.Parameter()
-    postgres_host = luigi.Parameter()
+    ## db parameters
+    mongo_connection_string = luigi.Parameter(default="mongodb+srv://ramsha0amir:gYk6WWjS0ACv6kFQ@cluster0.a0p69eg.mongodb.net/")
+    postgres_host = luigi.Parameter(default="database-2.c5go4e6kame4.us-east-1.rds.amazonaws.com")
     postgres_port = luigi.IntParameter(default=5432)
-    mongo_db_name = luigi.Parameter()
-    postgres_db_name = luigi.Parameter()
-    collection_name = luigi.Parameter()
-    postgres_db_username = luigi.Parameter()
-    postgres_db_password = luigi.Parameter()
+    mongo_db_name = luigi.Parameter(default="ev_database")
+    postgres_db_name = luigi.Parameter(default="postgres")
+    collection_name = luigi.Parameter(default="ev_emissions")
+    postgres_db_username = luigi.Parameter(default="postgres")
+    postgres_db_password = luigi.Parameter(default="javamylife")
 
     def requires(self):
         return Transform(
@@ -119,10 +120,10 @@ class Load(luigi.Task):
         )
     
     def input(self):
-        return luigi.LocalTarget("data/transformed_data.csv")
+        return luigi.LocalTarget("data/transformed_data.csv") ## transformed dataset
 
     def run(self):
-        conn = psycopg2.connect(
+        conn = psycopg2.connect(  # connect to postgres
             host = self.postgres_host,
             port = self.postgres_port,
             dbname = self.postgres_db_name,
@@ -133,6 +134,7 @@ class Load(luigi.Task):
         cursor = conn.cursor() 
         df = pd.read_csv(self.input().path, keep_default_na=False, low_memory=False, lineterminator='\n')
 
+        ## insert data to postgres
         for index, row in df.iterrows():
             row = dict(row)
             emission_values = (row['Stnd'], row['Cert Region'], row['Stnd Description'])
@@ -162,7 +164,6 @@ class Load(luigi.Task):
 
 
 if __name__ == "__main__":
-    from luigi import build
     build([Load()], local_scheduler=True)
 
 
